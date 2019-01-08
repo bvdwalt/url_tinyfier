@@ -1,6 +1,6 @@
 # url_tinyfier
 
-A new Flutter project.
+An implimentation of a url shortening app made with flutter.
 
 ## Getting Started
 
