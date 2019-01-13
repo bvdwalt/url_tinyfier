@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import './url.dart';
 import './UrlListItem.dart';
 import 'package:http/http.dart' as http;
@@ -12,7 +13,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'URL Tinyfier',
       theme: ThemeData(
-        primarySwatch: Colors.amber,
+        primarySwatch: Colors.blueGrey,
       ),
       home: MyHomePage(title: 'URL Tinyfier'),
     );
@@ -31,6 +32,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   List<Url> _listItems = new List();
   bool _loading = false;
+  BuildContext _scaffoldContext;
 
   void _addNewListItem(Url url) {
     setState(() {
@@ -40,16 +42,16 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: new ListView.builder(
+    Widget body = new Scaffold(
+      body: _loading ? new  Center(child: new CircularProgressIndicator(value: null)) : new ListView.builder(
           itemCount: _listItems.length,
           itemBuilder: (BuildContext ctxt, int index) {
             var item = _listItems[index];
             return GestureDetector(
-                child: UrlListItem(item), onTap: () => _launchURL(item));
+              child: UrlListItem(item),
+              onTap: () => _launchURL(item),
+              onLongPress: () => _copyToClipboard(item),
+            );
           }),
       resizeToAvoidBottomPadding: true,
       floatingActionButton: FloatingActionButton(
@@ -58,6 +60,24 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Icon(Icons.add),
       ),
     );
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title),
+      ),
+      body: new Builder(builder: (BuildContext context) {
+        _scaffoldContext = context;
+        return body;
+      }),
+    );
+  }
+
+  void _copyToClipboard(Url item) {
+    Clipboard.setData(new ClipboardData(text: item.shortURL));
+    Scaffold.of(_scaffoldContext).showSnackBar(new SnackBar(
+      content: new Text('Copied to Clipboard'),
+      duration: new Duration(seconds: 3),
+    ));
   }
 
   void _pushAddURLScreen() {
@@ -67,6 +87,9 @@ class _MyHomePageState extends State<MyHomePage> {
           body: new TextField(
             autofocus: true,
             onSubmitted: (val) {
+              if (val == '') {
+                return;
+              }
               _fetchData(val);
               Navigator.pop(context);
             },
