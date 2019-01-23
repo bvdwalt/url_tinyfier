@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import './url.dart';
 import './UrlListItem.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() => runApp(MyApp());
 
@@ -13,7 +16,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'URL Tinyfier',
       theme: ThemeData(
-        primarySwatch: Colors.blueGrey,
+        primarySwatch: Colors.teal,
       ),
       home: MyHomePage(title: 'URL Tinyfier'),
     );
@@ -30,29 +33,66 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  List<Url> _listItems = new List();
+  List<Url> _listItems = new List<Url>();
+  final String membershipKey = 'url_tinyfier_urls';
+  SharedPreferences _storage;
   bool _loading = false;
   BuildContext _scaffoldContext;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadList();
+  }
+
+  void _loadList() async {
+    _storage = await SharedPreferences.getInstance();
+    setState(() {
+      _listItems = new List();
+      json
+          .decode(_storage.getString(membershipKey))
+          .forEach((map) => _listItems.add(new Url.fromJson(map)));
+    });
+  }
+
+  void _updateList() async {
+    _storage.setString(membershipKey, json.encode(_listItems));
+  }
 
   void _addNewListItem(Url url) {
     setState(() {
       _listItems.add(url);
+      _updateList();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     Widget body = new Scaffold(
-      body: _loading ? new  Center(child: new CircularProgressIndicator(value: null)) : new ListView.builder(
-          itemCount: _listItems.length,
-          itemBuilder: (BuildContext ctxt, int index) {
-            var item = _listItems[index];
-            return GestureDetector(
-              child: UrlListItem(item),
-              onTap: () => _launchURL(item),
-              onLongPress: () => _copyToClipboard(item),
-            );
-          }),
+      body: _loading
+          ? new Center(child: new CircularProgressIndicator(value: null))
+          : new ListView.builder(
+              itemCount: _listItems?.length ?? 0,
+              itemBuilder: (BuildContext ctxt, int index) {
+                var item = _listItems[index];
+                return GestureDetector(
+                  child: Dismissible(
+                      key: Key(item.shortURL),
+                      background: Container(color: Colors.red),
+                      onDismissed: (direction) {
+                        setState(() {
+                          _listItems.removeAt(index);
+                          _updateList();
+                        });
+
+                        Scaffold.of(_scaffoldContext).showSnackBar(SnackBar(
+                            content: Text(item.shortURL + " dismissed")));
+                      },
+                      child: UrlListItem(item)),
+                  onTap: () => _launchURL(item),
+                  onLongPress: () => _copyToClipboard(item),
+                );
+              }),
       resizeToAvoidBottomPadding: true,
       floatingActionButton: FloatingActionButton(
         onPressed: _pushAddURLScreen,
@@ -88,6 +128,11 @@ class _MyHomePageState extends State<MyHomePage> {
             autofocus: true,
             onSubmitted: (val) {
               if (val == '') {
+                Scaffold.of(_scaffoldContext).showSnackBar(new SnackBar(
+                  content: new Text('Please enter a valid URL value'),
+                  duration: new Duration(seconds: 3),
+                ));
+                Navigator.pop(context);
                 return;
               }
               _fetchData(val);
