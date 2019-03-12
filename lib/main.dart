@@ -42,10 +42,10 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    _loadList();
+    _loadListFromStorage();
   }
 
-  void _loadList() async {
+  void _loadListFromStorage() async {
     _storage = await SharedPreferences.getInstance();
     setState(() {
       _listItems = new List();
@@ -55,15 +55,22 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  void _updateList() async {
+  void _updateListInStorage() async {
     _storage.setString(membershipKey, json.encode(_listItems));
   }
 
   void _addNewListItem(Url url) {
     setState(() {
       _listItems.add(url);
-      _updateList();
     });
+    _updateListInStorage();
+  }
+
+  void _removeListItemAt(int index) {
+    setState(() {
+      _listItems.removeAt(index);
+    });
+    _updateListInStorage();
   }
 
   @override
@@ -80,11 +87,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       key: Key(item.shortURL),
                       background: Container(color: Colors.red),
                       onDismissed: (direction) {
-                        setState(() {
-                          _listItems.removeAt(index);
-                          _updateList();
-                        });
-
+                        _removeListItemAt(index);
                         Scaffold.of(_scaffoldContext).showSnackBar(SnackBar(
                             content: Text(item.shortURL + " dismissed")));
                       },
@@ -121,28 +124,47 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _pushAddURLScreen() {
-    Navigator.of(context).push(new MaterialPageRoute(builder: (context) {
-      return new Scaffold(
-          appBar: new AppBar(title: new Text('Add a new short URL')),
-          body: new TextField(
-            autofocus: true,
-            onSubmitted: (val) {
-              if (val == '') {
-                Scaffold.of(_scaffoldContext).showSnackBar(new SnackBar(
-                  content: new Text('Please enter a valid URL value'),
-                  duration: new Duration(seconds: 3),
-                ));
-                Navigator.pop(context);
-                return;
-              }
-              _fetchData(val);
-              Navigator.pop(context);
-            },
-            decoration: new InputDecoration(
-                hintText: 'Enter the url you want to shorten...',
-                contentPadding: const EdgeInsets.all(16.0)),
-          ));
-    }));
+    if (!_loading) {
+      Navigator.of(context).push(new MaterialPageRoute(builder: (context) {
+        return new Scaffold(
+            appBar: new AppBar(title: new Text('Add a new short URL')),
+            body: new Form(
+              autovalidate: true,
+              child: new TextFormField(
+                autofocus: true,
+                decoration: const InputDecoration(
+                  icon: Icon(Icons.link),
+                  hintText: 'Enter the URL you would like to shorten',
+                  labelText: 'URL: *',
+                ),
+                initialValue: 'https://',
+                onFieldSubmitted: (String value) {
+                  if (_validateNewLongURL(value) != null) {
+                    return;
+                  }
+                  _fetchData(value);
+                  Navigator.pop(context);
+                },
+                validator: (String value) => _validateNewLongURL(value),
+              ),
+            ));
+      }));
+    }
+  }
+
+  _validateNewLongURL(String value) {
+    if (value == '') {
+      return 'Please enter a URL to shorten';
+    } else if (!value.contains('https://') && !value.contains('http://')) {
+      return 'Kindly pre-fix your URL with either "https://" or "http://"';
+    } else {
+      value = value.replaceFirst("https://", "");
+      value = value.replaceFirst("http://", "");
+      if (value == '') {
+       return 'Kindly enter a URL to shorten'; 
+      }
+    }
+    return null;
   }
 
   _fetchData(String longUrl) async {
