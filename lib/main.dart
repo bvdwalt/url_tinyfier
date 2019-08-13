@@ -89,7 +89,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       onDismissed: (direction) {
                         _removeListItemAt(index);
                         Scaffold.of(_scaffoldContext).showSnackBar(SnackBar(
-                            content: Text(item.shortURL + " dismissed")));
+                            content: Text(item.shortURL + " removed")));
                       },
                       child: UrlListItem(item)),
                   onTap: () => _launchURL(item),
@@ -146,6 +146,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   Navigator.pop(context);
                 },
                 validator: (String value) => _validateNewLongURL(value),
+                keyboardType: TextInputType.url,
               ),
             ));
       }));

@@ -15,7 +15,7 @@ class UrlListItem extends StatelessWidget {
             child: new Column(children: [
           new Text(
             url.shortURL,
-            textScaleFactor: 3,
+            textScaleFactor: 2,
             textAlign: TextAlign.left,
           ),
           new Text(
