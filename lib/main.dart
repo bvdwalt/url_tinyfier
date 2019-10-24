@@ -86,6 +86,31 @@ class _MyHomePageState extends State<MyHomePage> {
                   child: Dismissible(
                       key: Key(item.shortURL),
                       background: Container(color: Colors.red),
+                      confirmDismiss: (DismissDirection direction) async {
+                        final bool res = await showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              title: const Text("Confirm"),
+                              content: const Text(
+                                  "Are you sure you wish to delete this item?"),
+                              actions: <Widget>[
+                                FlatButton(
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(true),
+                                    child: const Text("DELETE")),
+                                FlatButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(false),
+                                  child: const Text("CANCEL"),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+
+                        return res;
+                      },
                       onDismissed: (direction) {
                         _removeListItemAt(index);
                         Scaffold.of(_scaffoldContext).showSnackBar(SnackBar(
@@ -162,7 +187,7 @@ class _MyHomePageState extends State<MyHomePage> {
       value = value.replaceFirst("https://", "");
       value = value.replaceFirst("http://", "");
       if (value == '') {
-       return 'Kindly enter a URL to shorten'; 
+        return 'Kindly enter a URL to shorten';
       }
     }
     return null;
