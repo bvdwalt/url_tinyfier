@@ -8,21 +8,21 @@ class UrlListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(16.0),
-      child: Row(children: [
-        Expanded(
-            child: Column(children: [
-          Text(
+    return new Padding(
+      padding: new EdgeInsets.all(16.0),
+      child: new Row(children: [
+        new Expanded(
+            child: new Column(children: [
+          new Text(
             url.shortURL,
             textScaleFactor: 2,
             textAlign: TextAlign.left,
           ),
-          Text(
+          new Text(
             url.longURL,
             textScaleFactor: 1,
             textAlign: TextAlign.right,
-            style: TextStyle(
+            style: new TextStyle(
               color: Colors.grey,
             ),
           ),
