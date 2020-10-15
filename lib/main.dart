@@ -1,10 +1,12 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:url_tinyfier/EnvironmentConfig.dart';
+import 'package:ads/ads.dart';
+import 'package:firebase_admob/firebase_admob.dart';
 
 import './UrlListItem.dart';
 import './url.dart';
@@ -17,7 +19,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'URL Tinyfier',
       theme: ThemeData(
-        primarySwatch: Colors.teal,
+        primarySwatch: Colors.green,
       ),
       home: MyHomePage(title: 'URL Tinyfier'),
     );
@@ -39,6 +41,7 @@ class _MyHomePageState extends State<MyHomePage> {
   SharedPreferences _storage;
   bool _loading = false;
   BuildContext _scaffoldContext;
+  Ads appAds;
 
   @override
   Widget build(BuildContext context) {
@@ -52,24 +55,28 @@ class _MyHomePageState extends State<MyHomePage> {
                 return GestureDetector(
                   child: Dismissible(
                       key: Key(item.shortURL),
-                      background: Container(color: Colors.red),
+                      crossAxisEndOffset: 0.15,
+                      background: Container(
+                        color: Colors.red,
+                        child: Icon(Icons.delete),
+                      ),
                       confirmDismiss: (DismissDirection direction) async {
                         final bool res = await showDialog(
                           context: context,
                           builder: (BuildContext context) {
                             return AlertDialog(
-                              title: const Text("Confirm"),
+                              title: const Text("Confirm removal"),
                               content: const Text(
-                                  "Are you sure you wish to delete this item?"),
+                                  "Are you sure you wish to remove this short URL item?"),
                               actions: <Widget>[
                                 FlatButton(
                                     onPressed: () =>
                                         Navigator.of(context).pop(true),
-                                    child: const Text("DELETE")),
+                                    child: const Text("Yes")),
                                 FlatButton(
                                   onPressed: () =>
                                       Navigator.of(context).pop(false),
-                                  child: const Text("CANCEL"),
+                                  child: const Text("No"),
                                 ),
                               ],
                             );
@@ -108,8 +115,31 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   @override
+  void dispose() {
+    appAds.dispose();
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
+
+    // Assign a listener.
+    var eventListener = (MobileAdEvent event) {
+      if (event == MobileAdEvent.opened) {
+        print("eventListener: The opened ad is clicked on.");
+      }
+    };
+
+    appAds = Ads(
+      EnvironmentConfig.Ad_Mob_App_ID,
+      bannerUnitId: EnvironmentConfig.Ad_Mob_Banner_ID,
+      keywords: ['URL', 'technology', 'internet'],
+      listener: eventListener,
+    );
+
+    appAds.showBannerAd();
+
     _loadListFromStorage();
   }
 
@@ -123,7 +153,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void _copyToClipboard(Url item) {
     Clipboard.setData(new ClipboardData(text: item.shortURL));
     Scaffold.of(_scaffoldContext).showSnackBar(new SnackBar(
-      content: new Text('Copied to Clipboard'),
+      content: new Text('Copied \'${item.shortURL}\' to Clipboard'),
       duration: new Duration(seconds: 3),
     ));
   }
@@ -156,40 +186,17 @@ class _MyHomePageState extends State<MyHomePage> {
     _storage = await SharedPreferences.getInstance();
     setState(() {
       _listItems = new List();
-      json
-          .decode(_storage.getString(membershipKey))
-          .forEach((map) => _listItems.add(new Url.fromJson(map)));
+      var hasItemsStored = _storage.containsKey(membershipKey);
+      if (hasItemsStored) {
+        json
+            .decode(_storage.getString(membershipKey))
+            .forEach((map) => _listItems.add(new Url.fromJson(map)));
+      }
     });
   }
 
-  void _pushAddURLScreen() {
-    if (!_loading) {
-      Navigator.of(context).push(new MaterialPageRoute(builder: (context) {
-        return new Scaffold(
-            appBar: new AppBar(title: new Text('Add a new short URL')),
-            body: new Form(
-              autovalidate: true,
-              child: new TextFormField(
-                autofocus: true,
-                decoration: const InputDecoration(
-                  icon: Icon(Icons.link),
-                  hintText: 'Enter the URL you would like to shorten',
-                  labelText: 'URL: *',
-                ),
-                initialValue: 'https://',
-                onFieldSubmitted: (String value) {
-                  if (_validateNewLongURL(value) != null) {
-                    return;
-                  }
-                  _fetchData(value);
-                  Navigator.pop(context);
-                },
-                validator: (String value) => _validateNewLongURL(value),
-                keyboardType: TextInputType.url,
-              ),
-            ));
-      }));
-    }
+  void _updateListInStorage() async {
+    _storage.setString(membershipKey, json.encode(_listItems));
   }
 
   void _removeListItemAt(int index) {
@@ -197,10 +204,6 @@ class _MyHomePageState extends State<MyHomePage> {
       _listItems.removeAt(index);
     });
     _updateListInStorage();
-  }
-
-  void _updateListInStorage() async {
-    _storage.setString(membershipKey, json.encode(_listItems));
   }
 
   _validateNewLongURL(String value) {
@@ -215,6 +218,42 @@ class _MyHomePageState extends State<MyHomePage> {
         return 'Kindly enter a URL to shorten';
       }
     }
+
     return null;
+  }
+
+  void _pushAddURLScreen() {
+    if (!_loading) {
+      Navigator.of(context).push(
+        new MaterialPageRoute(
+          builder: (context) {
+            return new Scaffold(
+              appBar: new AppBar(title: new Text('Add a new short URL')),
+              body: new Form(
+                autovalidate: true,
+                child: new TextFormField(
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    icon: Icon(Icons.link),
+                    hintText: 'Enter the URL you would like to shorten',
+                    labelText: 'URL: *',
+                  ),
+                  initialValue: 'https://',
+                  onFieldSubmitted: (String value) {
+                    if (_validateNewLongURL(value) != null) {
+                      return;
+                    }
+                    _fetchData(value);
+                    Navigator.pop(context);
+                  },
+                  validator: (String value) => _validateNewLongURL(value),
+                  keyboardType: TextInputType.url,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
   }
 }
